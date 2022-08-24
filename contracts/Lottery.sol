@@ -12,6 +12,7 @@ contract Lottery {
     address manager;
     bool hasEnded;
     bool canClaim;
+    bool isInit;
 
 
     /// Amount less than one ether
@@ -23,6 +24,9 @@ contract Lottery {
     /// You cannot claim now
     error CannotClaimNow();
 
+    /// Contract cannot be init
+    error CannotInit();
+
 
     modifier onlyManager {
         if(msg.sender != manager) {
@@ -31,15 +35,22 @@ contract Lottery {
         _;
     }
 
+    modifier cannotInit {
+        if(isInit) {
+            revert CannotInit();
+        }
+        _;
+    }
+
 
     /// @dev this function is serving as the constructor in this case
-    function initialize(address _manager) public {
+    function initialize(address _manager) public cannotInit {
         manager = _manager;
     }
 
     /// @dev when a user hits this function, they would be added to the lottery
     function cast(uint8 _slot) public payable {
-        if(msg.value > 1 ether) {
+        if(msg.value < 1 ether) {
             revert AmountLessThatOneEther();
         }
 
@@ -72,7 +83,10 @@ contract Lottery {
         hasEnded = true;
     }
 
-    function withdraw() public payable {
+    function withdraw() public payable onlyManager {
+        if(!hasEnded) {
+            revert CannotClaimNow(); // player must be paid before the manager can withdraw the funds from the contract
+        }
         payable(manager).transfer(address(this).balance);
     }
 
